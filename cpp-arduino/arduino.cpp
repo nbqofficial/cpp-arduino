@@ -1,5 +1,73 @@
 #include "arduino.h"
 
+arduino::arduino()
+{
+}
+
+arduino::arduino(LPCSTR device_name)
+{
+    if (attach(device_name)) { printf("Attached to %s\n", device_name); }
+}
+
+arduino::~arduino()
+{
+    detach();
+}
+
+bool arduino::attach(LPCSTR device_name)
+{
+    char port[] = "\\.\\";
+
+    while (!scan_devices(device_name, port))
+    {
+        Sleep(1000);
+    }
+
+    this->arduino_handle = CreateFile(port, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (this->arduino_handle)
+    {
+        DCB dcb = { 0 };
+        dcb.DCBlength = sizeof(dcb);
+        if (!GetCommState(this->arduino_handle, &dcb))
+        {
+            printf("GetCommState() failed\n");
+            CloseHandle(this->arduino_handle);
+            return false;
+        }
+
+        dcb.BaudRate = CBR_9600;
+        dcb.ByteSize = 8;
+        dcb.StopBits = ONESTOPBIT;
+        dcb.Parity = NOPARITY;
+        if (!SetCommState(this->arduino_handle, &dcb))
+        {
+            printf("SetCommState() failed\n");
+            CloseHandle(this->arduino_handle);
+            return false;
+        }
+
+        COMMTIMEOUTS cto = { 0 };
+        cto.ReadIntervalTimeout = 50;
+        cto.ReadTotalTimeoutConstant = 50;
+        cto.ReadTotalTimeoutMultiplier = 10;
+        cto.WriteTotalTimeoutConstant = 50;
+        cto.WriteTotalTimeoutMultiplier = 10;
+        if (!SetCommTimeouts(this->arduino_handle, &cto))
+        {
+            printf("SetCommTimeouts() failed\n");
+            CloseHandle(this->arduino_handle);
+            return false;
+        }
+        return true;
+    }
+    return false;
+}
+
+bool arduino::detach()
+{
+    return CloseHandle(this->arduino_handle);
+}
+
 bool arduino::scan_devices(LPCSTR device_name, LPSTR lp_out)
 {
     bool status = false;
@@ -46,52 +114,4 @@ bool arduino::send_data(char* buffer, DWORD buffer_size)
     return WriteFile(this->arduino_handle, buffer, buffer_size, &bytes_written, NULL);
 }
 
-arduino::arduino(LPCSTR device_name)
-{
-    char port[] = "\\.\\";
-    
-    while (!scan_devices(device_name, port))
-    {
-        Sleep(1000);
-    }
 
-    this->arduino_handle = CreateFile(port, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (this->arduino_handle)
-    {
-        DCB dcb = { 0 };
-        dcb.DCBlength = sizeof(dcb);
-        if (!GetCommState(this->arduino_handle, &dcb))
-        {
-            printf("GetCommState() failed\n");
-            CloseHandle(this->arduino_handle);
-        }
-
-        dcb.BaudRate = CBR_9600;
-        dcb.ByteSize = 8;
-        dcb.StopBits = ONESTOPBIT;
-        dcb.Parity = NOPARITY;
-        if (!SetCommState(this->arduino_handle, &dcb))
-        {
-            printf("SetCommState() failed\n");
-            CloseHandle(this->arduino_handle);
-        }
-
-        COMMTIMEOUTS cto = { 0 };
-        cto.ReadIntervalTimeout = 50;
-        cto.ReadTotalTimeoutConstant = 50;
-        cto.ReadTotalTimeoutMultiplier = 10;
-        cto.WriteTotalTimeoutConstant = 50;
-        cto.WriteTotalTimeoutMultiplier = 10;
-        if (!SetCommTimeouts(this->arduino_handle, &cto))
-        {
-            printf("SetCommTimeouts() failed\n");
-            CloseHandle(this->arduino_handle);
-        }
-        printf("Connected to %s\n", device_name);
-    }
-}
-
-arduino::~arduino()
-{
-    CloseHandle(this->arduino_handle);
-}
