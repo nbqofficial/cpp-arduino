@@ -6,7 +6,7 @@ arduino::arduino()
 
 arduino::arduino(LPCSTR device_name)
 {
-    if (attach(device_name)) { printf("Attached to %s\n", device_name); }
+    attach(device_name);
 }
 
 arduino::~arduino()
@@ -58,6 +58,7 @@ bool arduino::attach(LPCSTR device_name)
             CloseHandle(this->arduino_handle);
             return false;
         }
+        printf("Attached to %s\n", device_name);
         return true;
     }
     return false;
